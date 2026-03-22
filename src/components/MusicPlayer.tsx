@@ -27,17 +27,37 @@ export default function MusicPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playPromiseRef = useRef<Promise<void> | null>(null);
 
   const currentTrack = TRACKS[currentTrackIndex];
 
-  const togglePlay = () => {
+  const safePlay = async () => {
+    if (audioRef.current) {
+      try {
+        playPromiseRef.current = audioRef.current.play();
+        await playPromiseRef.current;
+      } catch (error) {
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error("Playback failed:", error);
+        }
+      } finally {
+        playPromiseRef.current = null;
+      }
+    }
+  };
+
+  const togglePlay = async () => {
     if (audioRef.current) {
       if (isPlaying) {
+        if (playPromiseRef.current) {
+          await playPromiseRef.current;
+        }
         audioRef.current.pause();
+        setIsPlaying(false);
       } else {
-        audioRef.current.play();
+        setIsPlaying(true);
+        await safePlay();
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
@@ -55,7 +75,7 @@ export default function MusicPlayer() {
     if (audioRef.current) {
       audioRef.current.src = currentTrack.url;
       if (isPlaying) {
-        audioRef.current.play();
+        safePlay();
       }
     }
   }, [currentTrackIndex]);
